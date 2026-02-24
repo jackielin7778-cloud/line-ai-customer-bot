@@ -200,29 +200,85 @@ def get_speech_recognition_html():
     return """
     <script>
     function startRecording() {
-        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-            alert('您的瀏覽器不支援語音辨識，請使用 Chrome');
+        // 檢查瀏覽器支援
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        
+        if (!SpeechRecognition) {
+            alert('您的瀏覽器不支援語音辨識！\\n\\n請使用 Chrome 瀏覽器，或直接輸入文字。');
             return;
         }
         
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
         const recognition = new SpeechRecognition();
         
         recognition.lang = 'zh-TW';
         recognition.interimResults = false;
         recognition.maxAlternatives = 1;
         
-        document.getElementById('status').innerHTML = '🎤 正在聆聽...';
+        // 顯示狀態
+        const statusDiv = document.getElementById('voice_status');
+        if (statusDiv) {
+            statusDiv.innerHTML = '🎤 正在聆聽... 請說話';
+            statusDiv.style.color = 'blue';
+        }
         
         recognition.onresult = function(event) {
             const transcript = event.results[0][0].transcript;
-            document.getElementById('user_input').value = transcript;
-            document.getElementById('status').innerHTML = '✓ 已識別：' + transcript;
-            document.getElementById('send_btn').click();
+            
+            // 填入輸入框
+            const input = document.querySelector('input[type="text"]');
+            if (input) {
+                input.value = transcript;
+            }
+            
+            if (statusDiv) {
+                statusDiv.innerHTML = '✓ 已識別：' + transcript;
+                statusDiv.style.color = 'green';
+            }
+            
+            // 自動點擊發送按鈕
+            setTimeout(() => {
+                const buttons = document.querySelectorAll('button');
+                buttons.forEach(btn => {
+                    if (btn.textContent.includes('Send') || btn.querySelector('svg')) {
+                        btn.click();
+                    }
+                });
+            }, 500);
         };
         
         recognition.onerror = function(event) {
-            document.getElementById('status').innerHTML = '✗ 錯誤：' + event.error;
+            let errorMsg = '語音辨識錯誤';
+            switch(event.error) {
+                case 'no-speech':
+                    errorMsg = '沒有偵測到語音，請再試一次';
+                    break;
+                case 'audio-capture':
+                    errorMsg = '無法使用麥克風，請檢查權限';
+                    break;
+                case 'not-allowed':
+                    errorMsg = '麥克風權限被拒絕，請允許存取';
+                    break;
+                default:
+                    errorMsg = '錯誤：' + event.error;
+            }
+            
+            if (statusDiv) {
+                statusDiv.innerHTML = '✗ ' + errorMsg;
+                statusDiv.style.color = 'red';
+            }
+        };
+        
+        recognition.onend = function() {
+            if (statusDiv && statusDiv.textContent.includes('聆聽')) {
+                statusDiv.innerHTML = '👂 等待輸入...';
+                statusDiv.style.color = 'gray';
+            }
+        };
+        
+        recognition.start();
+    }
+    </script>
+    """
         };
         
         recognition.onend = function() {
@@ -313,6 +369,8 @@ with col1:
 
 with col2:
     # 語音輸入按鈕
+    st.markdown('<div id="voice_status" style="padding: 10px; font-weight: bold;">👂 點擊按鈕說話</div>', unsafe_allow_html=True)
+    
     if st.button("🎤 語音輸入", use_container_width=True):
         st.markdown("""
         <script>
