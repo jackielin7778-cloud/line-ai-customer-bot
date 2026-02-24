@@ -8,7 +8,7 @@ import os
 import logging
 from flask import Flask, request, jsonify
 from linebot import LineBotApi, WebhookParser
-from linebot.models import MessageEvent, TextMessage, AudioMessage, TemplateSendMessage, ButtonsTemplate, MessageTemplateAction, URITemplateAction
+from linebot.models import MessageEvent, TextMessage, AudioMessage, FollowEvent, TemplateSendMessage, ButtonsTemplate, MessageTemplateAction, URITemplateAction
 from linebot.exceptions import InvalidSignatureError
 from dotenv import load_dotenv
 
@@ -105,7 +105,13 @@ def callback():
         return jsonify({"error": str(e)}), 400
     
     for event in events:
-        if isinstance(event, MessageEvent):
+        if isinstance(event, FollowEvent):
+            # 用戶加入/追蹤官方帳號
+            try:
+                reply_with_button(event.reply_token, WELCOME_MESSAGE)
+            except Exception as e:
+                logger.error(f"Follow event error: {e}")
+        elif isinstance(event, MessageEvent):
             try:
                 handle_message(event)
             except Exception as e:
@@ -116,9 +122,17 @@ def callback():
 
 def handle_message(event):
     """處理訊息"""
+    # 檢查是否有有效的回覆 token
+    if not event.reply_token or event.reply_token == '':
+        logger.warning("無效的 reply token")
+        return
+    
     # 語音訊息
     if isinstance(event.message, AudioMessage):
-        reply_with_button(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
+        try:
+            reply_with_button(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
+        except Exception as e:
+            logger.error(f"回覆失敗: {e}")
         return
     
     # 只處理文字訊息
