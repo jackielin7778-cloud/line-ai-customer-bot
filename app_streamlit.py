@@ -362,13 +362,7 @@ with col2:
     st.markdown('<div id="voice_status" style="padding: 10px; font-weight: bold;">👂 點擊按鈕說話</div>', unsafe_allow_html=True)
     
     if st.button("🎤 語音輸入", use_container_width=True):
-        st.markdown("""
-        <script>
-        if (typeof startRecording === 'function') {
-            startRecording();
-        }
-        </script>
-        """, unsafe_allow_html=True)
+        st.markdown('<script>if(typeof startRecording==="function"){startRecording();}</script>', unsafe_allow_html=True)
 
 # 處理輸入
 if user_input:
