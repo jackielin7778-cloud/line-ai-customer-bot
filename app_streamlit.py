@@ -357,12 +357,58 @@ col1, col2 = st.columns([4, 1])
 with col1:
     user_input = st.chat_input("請輸入您的問題...")
 
+# ===== 語音輸入按鈕 =====
 with col2:
-    # 語音輸入按鈕
-    st.markdown('<div id="voice_status" style="padding: 10px; font-weight: bold;">👂 點擊按鈕說話</div>', unsafe_allow_html=True)
-    
-    if st.button("🎤 語音輸入", use_container_width=True):
-        st.markdown('<script>if(typeof startRecording==="function"){startRecording();}</script>', unsafe_allow_html=True)
+    st.markdown("""
+    <style>
+    .voice-btn {
+        width: 100%;
+        padding: 15px;
+        background: #4CAF50;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        font-size: 18px;
+        cursor: pointer;
+    }
+    .voice-btn:hover { background: #45a049; }
+    </style>
+    <button class="voice-btn" onclick="startVoice()">🎤 點擊說話</button>
+    <div id="voice_status" style="padding: 10px; font-weight: bold; color: gray;">👂 準備好了</div>
+    <script>
+    function startVoice() {
+        const status = document.getElementById('voice_status');
+        if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+            status.innerHTML = '❌ 瀏覽器不支援，請用 Chrome';
+            return;
+        }
+        
+        const recognition = new webkitSpeechRecognition() || SpeechRecognition();
+        recognition.lang = 'zh-TW';
+        recognition.interimResults = false;
+        
+        status.innerHTML = '🎤 請說話...';
+        
+        recognition.onresult = function(event) {
+            const transcript = event.results[0][0].transcript;
+            status.innerHTML = '✓ 識別完成：' + transcript;
+            
+            // 模擬輸入
+            const inputs = document.querySelectorAll('input[type="text"]');
+            if (inputs.length > 0) {
+                inputs[0].value = transcript;
+                inputs[0].dispatchEvent(new Event('input', {bubbles: true}));
+            }
+        };
+        
+        recognition.onerror = function(e) {
+            status.innerHTML = '❌ 錯誤：' + e.error;
+        };
+        
+        recognition.start();
+    }
+    </script>
+    """, unsafe_allow_html=True)
 
 # 處理輸入
 if user_input:
