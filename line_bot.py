@@ -127,37 +127,28 @@ def handle_message(event):
         logger.warning("無效的 reply token")
         return
     
-    # 語音訊息
+    # 語音訊息 - 直接回覆按鈕
     if isinstance(event.message, AudioMessage):
         try:
-            # 先回覆文字訊息
-            line_bot_api.reply_message(
-                event.reply_token,
-                TextSendMessage(text="您好！我收到您的語音訊息了～\n請直接輸入文字問題，或點擊下方按鈕開啟網頁版客服！")
-            )
-            logger.info("語音訊息回覆成功")
+            reply_with_button(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
         except Exception as e:
             logger.error(f"回覆失敗: {e}")
         return
     
-    # 只處理文字訊息
-    if not isinstance(event.message, TextMessage):
-        return
-    
-    user_text = event.message.text
-    reply_token = event.reply_token
-    
-    logger.info(f"收到訊息: {user_text}")
-    
-    # 檢查關鍵詞
-    keyword_reply = find_keyword_reply(user_text)
-    
-    if keyword_reply:
-        # 有匹配的關鍵詞，回覆文字 + 按鈕
-        reply_with_button(reply_token, keyword_reply)
-    else:
-        # 沒有匹配，回覆引導訊息 + 按鈕
-        reply_with_button(reply_token, FALLBACK_REPLY)
+    # 文字訊息
+    if isinstance(event.message, TextMessage):
+        user_text = event.message.text
+        reply_token = event.reply_token
+        
+        logger.info(f"收到訊息: {user_text}")
+        
+        # 檢查關鍵詞
+        keyword_reply = find_keyword_reply(user_text)
+        
+        if keyword_reply:
+            reply_with_button(reply_token, keyword_reply)
+        else:
+            reply_with_button(reply_token, FALLBACK_REPLY)
 
 
 def reply_with_button(reply_token, text):
