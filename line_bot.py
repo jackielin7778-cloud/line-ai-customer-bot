@@ -98,38 +98,27 @@ def callback():
         
         elif isinstance(event, MessageEvent):
             user_id = event.source.user_id
-            
-            # 處理所有訊息類型
             msg_type = type(event.message).__name__
-            logger.info(f"收到訊息類型: {msg_type}")
+            logger.info(f"收到訊息類型: {msg_type}, user_id: {user_id}")
             
-            if isinstance(event.message, AudioMessage):
-                # 語音訊息
-                try:
-                    line_bot_api.push_message(
-                        user_id,
-                        TextSendMessage(text="您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
-                    )
-                except Exception as e:
-                    logger.error(f"Push error: {e}")
-            elif isinstance(event.message, TextMessage):
-                # 文字訊息
-                user_text = event.message.text
-                keyword_reply = find_keyword_reply(user_text)
-                reply_text = keyword_reply if keyword_reply else FALLBACK_REPLY
-                try:
-                    line_bot_api.push_message(user_id, TextSendMessage(text=reply_text))
-                except Exception as e:
-                    logger.error(f"Push error: {e}")
-            else:
-                # 其他訊息類型
-                try:
-                    line_bot_api.push_message(
-                        user_id,
-                        TextSendMessage(text="您好！我已收到您的訊息。\n\n請輸入文字問題，我會立即為您服務！")
-                    )
-                except Exception as e:
-                    logger.error(f"Push error: {e}")
+            # 對所有訊息都回覆
+            try:
+                reply_msg = "您好！我已收到您的訊息。"
+                
+                if isinstance(event.message, TextMessage):
+                    user_text = event.message.text
+                    keyword_reply = find_keyword_reply(user_text)
+                    if keyword_reply:
+                        reply_msg = keyword_reply
+                    else:
+                        reply_msg = FALLBACK_REPLY
+                elif isinstance(event.message, AudioMessage):
+                    reply_msg = "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！"
+                
+                line_bot_api.push_message(user_id, TextSendMessage(text=reply_msg))
+                logger.info(f"已發送訊息給 {user_id}")
+            except Exception as e:
+                logger.error(f"Push error: {e}")
     
     return jsonify({"status": "ok"})
 
