@@ -279,16 +279,6 @@ def get_speech_recognition_html():
     }
     </script>
     """
-        };
-        
-        recognition.onend = function() {
-            document.getElementById('status').innerHTML = '';
-        };
-        
-        recognition.start();
-    }
-    </script>
-    """
 
 
 # ===== 側邊欄 =====
