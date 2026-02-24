@@ -5,12 +5,18 @@ LINE AI 客服 Bot
 - 用戶點擊後在瀏覽器繼續對話
 """
 import os
+import logging
 from flask import Flask, request, jsonify
 from linebot import LineBotApi, WebhookParser
 from linebot.models import MessageEvent, TextMessage, TemplateSendMessage, ButtonsTemplate, MessageTemplateAction, URITemplateAction
+from linebot.exceptions import InvalidSignatureError
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# 設定日誌
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
@@ -18,6 +24,12 @@ app = Flask(__name__)
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 STREAMLIT_URL = os.getenv("STREAMLIT_URL", "https://your-app.streamlit.app")
+
+# 驗證環境變數
+if not LINE_CHANNEL_ACCESS_TOKEN:
+    logger.error("LINE_CHANNEL_ACCESS_TOKEN 未設定！")
+if not LINE_CHANNEL_SECRET:
+    logger.error("LINE_CHANNEL_SECRET 未設定！")
 
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
@@ -75,25 +87,42 @@ def find_keyword_reply(text):
 @app.route("/callback", methods=["POST"])
 def callback():
     """LINE Webhook 入口"""
-    signature = request.headers.get("X-Line-Signature")
+    if request.method != "POST":
+        return jsonify({"error": "Method not allowed"}), 405
+    
+    signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
+    
+    logger.info(f"收到 LINE Webhook: {body[:100]}...")
     
     try:
         events = parser.parse(body, signature)
-    except:
+    except InvalidSignatureError:
+        logger.error("Invalid signature")
         return jsonify({"error": "Invalid signature"}), 400
+    except Exception as e:
+        logger.error(f"Parse error: {e}")
+        return jsonify({"error": str(e)}), 400
     
     for event in events:
         if isinstance(event, MessageEvent):
-            handle_message(event)
+            try:
+                handle_message(event)
+            except Exception as e:
+                logger.error(f"Handle message error: {e}")
     
     return jsonify({"status": "ok"})
 
 
 def handle_message(event):
     """處理訊息"""
-    user_text = event.message.text if isinstance(event.message, TextMessage) else ""
+    if not isinstance(event.message, TextMessage):
+        return
+    
+    user_text = event.message.text
     reply_token = event.reply_token
+    
+    logger.info(f"收到訊息: {user_text}")
     
     # 檢查關鍵詞
     keyword_reply = find_keyword_reply(user_text)
@@ -112,7 +141,7 @@ def reply_with_button(reply_token, text):
         message = TemplateSendMessage(
             alt_text="點擊開啟 AI 客服",
             template=ButtonsTemplate(
-                text=text,
+                text=text[:60] + "..." if len(text) > 60 else text,
                 actions=[
                     URITemplateAction(
                         label="💬 開啟 AI 客服網頁",
@@ -126,10 +155,12 @@ def reply_with_button(reply_token, text):
             )
         )
         line_bot_api.reply_message(reply_token, message)
+        logger.info("回覆成功")
     except Exception as e:
+        logger.error(f"回覆失敗: {e}")
         # 如果失敗，只回覆文字
         try:
-            line_bot_api.reply_message(reply_token, TextSendMessage(text=text))
+            line_bot_api.reply_message(reply_token, TextSendMessage(text=text[:500]))
         except:
             pass
 
@@ -140,16 +171,20 @@ def index():
     return jsonify({
         "status": "running",
         "service": "LINE AI 客服 Bot",
-        "version": "1.0.0"
+        "version": "1.0.1"
     })
 
 
-# ===== 開放端口 =====
+# ===== 健康檢查 =====
 @app.route("/health")
 def health():
-    return jsonify({"status": "ok"})
+    return jsonify({
+        "status": "ok",
+        "line_configured": bool(LINE_CHANNEL_ACCESS_TOKEN and LINE_CHANNEL_SECRET)
+    })
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    logger.info(f"啟動伺服器，PORT={port}")
     app.run(host="0.0.0.0", port=port)
