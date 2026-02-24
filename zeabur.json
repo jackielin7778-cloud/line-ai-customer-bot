@@ -1,0 +1,11 @@
+{
+  "build": {
+    "builder": "python",
+    "options": {
+      "mainFile": "line_bot.py"
+    }
+  },
+  "start": {
+    "command": "python line_bot.py"
+  }
+}
