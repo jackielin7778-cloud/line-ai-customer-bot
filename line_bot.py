@@ -6,7 +6,7 @@ import os
 import logging
 from flask import Flask, request, jsonify
 from linebot import LineBotApi, WebhookParser
-from linebot.models import MessageEvent, TextMessage, AudioMessage, FollowEvent
+from linebot.models import MessageEvent, TextMessage, AudioMessage, FollowEvent, VideoMessage, FileMessage, ImageMessage
 from linebot.exceptions import InvalidSignatureError
 from dotenv import load_dotenv
 
@@ -88,6 +88,8 @@ def callback():
         return jsonify({"error": str(e)}), 400
     
     for event in events:
+        logger.info(f"收到事件類型: {type(event).__name__}")
+        
         if isinstance(event, FollowEvent):
             user_id = event.source.user_id
             try:
@@ -112,13 +114,13 @@ def callback():
                         reply_msg = keyword_reply
                     else:
                         reply_msg = FALLBACK_REPLY
-                elif isinstance(event.message, AudioMessage):
-                    reply_msg = "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！"
                 
                 line_bot_api.push_message(user_id, TextSendMessage(text=reply_msg))
                 logger.info(f"已發送訊息給 {user_id}")
             except Exception as e:
                 logger.error(f"Push error: {e}")
+        else:
+            logger.info(f"其他事件類型: {type(event).__name__}")
     
     return jsonify({"status": "ok"})
 
