@@ -118,7 +118,7 @@ def handle_message(event):
     """處理訊息"""
     # 語音訊息
     if isinstance(event.message, AudioMessage):
-        reply_text(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！\n\n或點擊下方按鈕開啟網頁版客服，有更完整的服務！")
+        reply_with_button(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
         return
     
     # 只處理文字訊息
