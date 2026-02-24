@@ -130,7 +130,12 @@ def handle_message(event):
     # 語音訊息
     if isinstance(event.message, AudioMessage):
         try:
-            reply_with_button(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
+            # 先回覆文字訊息
+            line_bot_api.reply_message(
+                event.reply_token,
+                TextSendMessage(text="您好！我收到您的語音訊息了～\n請直接輸入文字問題，或點擊下方按鈕開啟網頁版客服！")
+            )
+            logger.info("語音訊息回覆成功")
         except Exception as e:
             logger.error(f"回覆失敗: {e}")
         return
