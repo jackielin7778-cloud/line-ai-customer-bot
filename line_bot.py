@@ -111,7 +111,7 @@ def callback():
             
             elif isinstance(event.message, TextMessage):
                 user_text = event.message.text
-                logger.info(f"收到訊息: {user_text}")
+                logger.info(f"收到文字訊息: {user_text}")
                 
                 keyword_reply = find_keyword_reply(user_text)
                 
