@@ -1,40 +1,29 @@
 """
 LINE AI 客服 Bot
-- 接收 LINE 訊息
-- 回覆 Streamlit 網頁按鈕
-- 用戶點擊後在瀏覽器繼續對話
+使用 Push Message 方式回覆
 """
 import os
 import logging
 from flask import Flask, request, jsonify
 from linebot import LineBotApi, WebhookParser
-from linebot.models import MessageEvent, TextMessage, AudioMessage, FollowEvent, TemplateSendMessage, ButtonsTemplate, MessageTemplateAction, URITemplateAction
+from linebot.models import MessageEvent, TextMessage, AudioMessage, FollowEvent
 from linebot.exceptions import InvalidSignatureError
 from dotenv import load_dotenv
 
 load_dotenv()
 
-# 設定日誌
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# ===== 環境變數 =====
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
 STREAMLIT_URL = os.getenv("STREAMLIT_URL", "https://line-ai-customer-bot-dpd8h2rkqdyyeqm9ry99yn.streamlit.app/")
 
-# 驗證環境變數
-if not LINE_CHANNEL_ACCESS_TOKEN:
-    logger.error("LINE_CHANNEL_ACCESS_TOKEN 未設定！")
-if not LINE_CHANNEL_SECRET:
-    logger.error("LINE_CHANNEL_SECRET 未設定！")
-
 line_bot_api = LineBotApi(LINE_CHANNEL_ACCESS_TOKEN)
 parser = WebhookParser(LINE_CHANNEL_SECRET)
 
-# ===== 歡迎訊息 =====
 WELCOME_MESSAGE = """您好！👋
 
 我是關網資訊 AI 客服小幫手～
@@ -45,12 +34,11 @@ WELCOME_MESSAGE = """您好！👋
 • 發票查詢與對獎
 • 載具設定說明
 
-請直接輸入您的問題，或點擊下方按鈕開啟網頁版對話～
+請直接輸入您的問題～
 
 📞 客服專線：02-7750-5070
 🌐 官網：https://www.gateweb.com.tw/"""
 
-# ===== 問題關鍵詞回覆 =====
 QA_REPLIES = {
     "什麼是電子發票": "電子發票是指開立人或接收人透過網路或其他電子方式開立、傳輸或接收的統一發票。",
     "如何申請": "申請電子發票服務，請洽關網資訊：\n電話：02-7750-5070\nEmail：cs@gateweb.com.tw\nLINE：https://lin.ee/ob1dBrB",
@@ -71,11 +59,10 @@ FALLBACK_REPLY = """抱歉，我不太理解您的問題... 😔
 • 發票如何查詢？
 • 發票可以作廢嗎？
 
-或點擊下方按鈕開啟網頁版對話，有更完整的服務！"""
+或致電 02-7750-5070 由專人服務。"""
 
 
 def find_keyword_reply(text):
-    """從關鍵詞找到回覆"""
     text = text.lower()
     for keyword, reply in QA_REPLIES.items():
         if keyword in text:
@@ -83,126 +70,74 @@ def find_keyword_reply(text):
     return None
 
 
-# ===== Webhook =====
 @app.route("/callback", methods=["POST"])
 def callback():
-    """LINE Webhook 入口"""
     if request.method != "POST":
         return jsonify({"error": "Method not allowed"}), 405
     
     signature = request.headers.get("X-Line-Signature", "")
     body = request.get_data(as_text=True)
     
-    logger.info(f"收到 LINE Webhook: {body[:100]}...")
+    logger.info("收到 LINE Webhook")
     
     try:
         events = parser.parse(body, signature)
     except InvalidSignatureError:
-        logger.error("Invalid signature")
         return jsonify({"error": "Invalid signature"}), 400
     except Exception as e:
-        logger.error(f"Parse error: {e}")
         return jsonify({"error": str(e)}), 400
     
     for event in events:
         if isinstance(event, FollowEvent):
-            # 用戶加入/追蹤官方帳號
+            user_id = event.source.user_id
             try:
-                reply_with_button(event.reply_token, WELCOME_MESSAGE)
+                line_bot_api.push_message(user_id, TextSendMessage(text=WELCOME_MESSAGE))
+                logger.info(f"歡迎訊息已發送給 {user_id}")
             except Exception as e:
-                logger.error(f"Follow event error: {e}")
+                logger.error(f"Push error: {e}")
+        
         elif isinstance(event, MessageEvent):
-            try:
-                handle_message(event)
-            except Exception as e:
-                logger.error(f"Handle message error: {e}")
+            user_id = event.source.user_id
+            
+            if isinstance(event.message, AudioMessage):
+                try:
+                    line_bot_api.push_message(
+                        user_id,
+                        TextSendMessage(text="您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
+                    )
+                    logger.info(f"語音回覆已發送給 {user_id}")
+                except Exception as e:
+                    logger.error(f"Push error: {e}")
+            
+            elif isinstance(event.message, TextMessage):
+                user_text = event.message.text
+                logger.info(f"收到訊息: {user_text}")
+                
+                keyword_reply = find_keyword_reply(user_text)
+                
+                if keyword_reply:
+                    reply_text = keyword_reply
+                else:
+                    reply_text = FALLBACK_REPLY
+                
+                try:
+                    line_bot_api.push_message(user_id, TextSendMessage(text=reply_text))
+                    logger.info(f"回覆已發送給 {user_id}")
+                except Exception as e:
+                    logger.error(f"Push error: {e}")
     
     return jsonify({"status": "ok"})
 
 
-# ===== 測試用 =====
-TEST_MODE = True  # 改為 False 關閉測試模式
-
-
-def handle_message(event):
-    """處理訊息"""
-    # 語音訊息 - 直接回覆按鈕
-    if isinstance(event.message, AudioMessage):
-        reply_text_only(event.reply_token, "您好！我收到您的語音訊息了～\n請直接輸入文字問題！")
-        return
-    
-    # 文字訊息
-    if isinstance(event.message, TextMessage):
-        user_text = event.message.text
-        logger.info(f"收到訊息: {user_text}")
-        
-        # 檢查關鍵詞
-        keyword_reply = find_keyword_reply(user_text)
-        
-        if keyword_reply:
-            reply_with_button(event.reply_token, keyword_reply)
-        else:
-            reply_with_button(event.reply_token, FALLBACK_REPLY)
-
-
-def reply_text_only(token, text):
-    """只回覆文字"""
-    try:
-        line_bot_api.reply_message(token, TextSendMessage(text=text))
-    except Exception as e:
-        logger.error(f"回覆失敗: {e}")
-
-
-def reply_with_button(reply_token, text):
-    """回覆訊息 + 開啟網頁按鈕"""
-    try:
-        message = TemplateSendMessage(
-            alt_text="點擊開啟 AI 客服",
-            template=ButtonsTemplate(
-                text=text[:60] + "..." if len(text) > 60 else text,
-                actions=[
-                    URITemplateAction(
-                        label="💬 開啟 AI 客服網頁",
-                        uri=STREAMLIT_URL
-                    ),
-                    MessageTemplateAction(
-                        label="📞 聯絡客服人員",
-                        text="我要找真人客服"
-                    )
-                ]
-            )
-        )
-        line_bot_api.reply_message(reply_token, message)
-        logger.info("回覆成功")
-    except Exception as e:
-        logger.error(f"回覆失敗: {e}")
-        # 如果失敗，只回覆文字
-        try:
-            line_bot_api.reply_message(reply_token, TextSendMessage(text=text[:500]))
-        except:
-            pass
-
-
-def reply_text(reply_token, text):
-    """回覆文字訊息"""
-    try:
-        line_bot_api.reply_message(reply_token, TextSendMessage(text=text))
-        logger.info("回覆成功")
-    except Exception as e:
-        logger.error(f"回覆失敗: {e}")
-
-
-# ===== 首頁 =====
 @app.route("/")
 def index():
     return jsonify({
         "status": "running",
         "service": "LINE AI 客服 Bot",
-        "version": "1.0.1"
+        "version": "2.0.0"
     })
 
 
-# ===== 健康檢查 =====
 @app.route("/health")
 def health():
     return jsonify({
@@ -212,6 +147,6 @@ def health():
 
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 8080))
     logger.info(f"啟動伺服器，PORT={port}")
     app.run(host="0.0.0.0", port=port)
