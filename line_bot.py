@@ -120,35 +120,37 @@ def callback():
     return jsonify({"status": "ok"})
 
 
+# ===== 測試用 =====
+TEST_MODE = True  # 改為 False 關閉測試模式
+
+
 def handle_message(event):
     """處理訊息"""
-    # 檢查是否有有效的回覆 token
-    if not event.reply_token or event.reply_token == '':
-        logger.warning("無效的 reply token")
-        return
-    
     # 語音訊息 - 直接回覆按鈕
     if isinstance(event.message, AudioMessage):
-        try:
-            reply_with_button(event.reply_token, "您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
-        except Exception as e:
-            logger.error(f"回覆失敗: {e}")
+        reply_text_only(event.reply_token, "您好！我收到您的語音訊息了～\n請直接輸入文字問題！")
         return
     
     # 文字訊息
     if isinstance(event.message, TextMessage):
         user_text = event.message.text
-        reply_token = event.reply_token
-        
         logger.info(f"收到訊息: {user_text}")
         
         # 檢查關鍵詞
         keyword_reply = find_keyword_reply(user_text)
         
         if keyword_reply:
-            reply_with_button(reply_token, keyword_reply)
+            reply_with_button(event.reply_token, keyword_reply)
         else:
-            reply_with_button(reply_token, FALLBACK_REPLY)
+            reply_with_button(event.reply_token, FALLBACK_REPLY)
+
+
+def reply_text_only(token, text):
+    """只回覆文字"""
+    try:
+        line_bot_api.reply_message(token, TextSendMessage(text=text))
+    except Exception as e:
+        logger.error(f"回覆失敗: {e}")
 
 
 def reply_with_button(reply_token, text):
