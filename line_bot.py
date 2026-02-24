@@ -23,7 +23,7 @@ app = Flask(__name__)
 # ===== 環境變數 =====
 LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN", "")
 LINE_CHANNEL_SECRET = os.getenv("LINE_CHANNEL_SECRET", "")
-STREAMLIT_URL = os.getenv("STREAMLIT_URL", "https://your-app.streamlit.app")
+STREAMLIT_URL = os.getenv("STREAMLIT_URL", "https://line-ai-customer-bot-dpd8h2rkqdyyeqm9ry99yn.streamlit.app/")
 
 # 驗證環境變數
 if not LINE_CHANNEL_ACCESS_TOKEN:
