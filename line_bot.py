@@ -99,30 +99,35 @@ def callback():
         elif isinstance(event, MessageEvent):
             user_id = event.source.user_id
             
+            # 處理所有訊息類型
+            msg_type = type(event.message).__name__
+            logger.info(f"收到訊息類型: {msg_type}")
+            
             if isinstance(event.message, AudioMessage):
+                # 語音訊息
                 try:
                     line_bot_api.push_message(
                         user_id,
                         TextSendMessage(text="您好！我收到您的語音訊息了～\n\n請直接輸入文字問題，我會立即為您服務！")
                     )
-                    logger.info(f"語音回覆已發送給 {user_id}")
                 except Exception as e:
                     logger.error(f"Push error: {e}")
-            
             elif isinstance(event.message, TextMessage):
+                # 文字訊息
                 user_text = event.message.text
-                logger.info(f"收到文字訊息: {user_text}")
-                
                 keyword_reply = find_keyword_reply(user_text)
-                
-                if keyword_reply:
-                    reply_text = keyword_reply
-                else:
-                    reply_text = FALLBACK_REPLY
-                
+                reply_text = keyword_reply if keyword_reply else FALLBACK_REPLY
                 try:
                     line_bot_api.push_message(user_id, TextSendMessage(text=reply_text))
-                    logger.info(f"回覆已發送給 {user_id}")
+                except Exception as e:
+                    logger.error(f"Push error: {e}")
+            else:
+                # 其他訊息類型
+                try:
+                    line_bot_api.push_message(
+                        user_id,
+                        TextSendMessage(text="您好！我已收到您的訊息。\n\n請輸入文字問題，我會立即為您服務！")
+                    )
                 except Exception as e:
                     logger.error(f"Push error: {e}")
     
