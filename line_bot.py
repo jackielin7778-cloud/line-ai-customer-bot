@@ -128,7 +128,7 @@ def index():
     return jsonify({
         "status": "running",
         "service": "LINE AI 客服 Bot",
-        "version": "2.0.1"
+        "version": "2.0.2 - 测试"
     })
 
 
